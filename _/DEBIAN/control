@@ -1,0 +1,10 @@
+Package: com.yourcompany.touchoriginal
+Name: touchoriginal
+Depends: mobilesubstrate
+Architecture: iphoneos-arm
+Description: An awesome MobileSubstrate tweak!
+Maintainer: Samuel Yeung
+Author: Samuel Yeung
+Section: Tweaks
+Version: 0.0.1-38
+Installed-Size: 88
