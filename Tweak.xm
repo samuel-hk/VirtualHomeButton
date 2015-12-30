@@ -1,6 +1,11 @@
 #import <AudioToolbox/AudioToolbox.h>
 #import "SpringBoard/SBUIController.h"
-//#import <SpringBoard/SBUIController.h>
+#import <SpringBoard/SBBacklightController.h>
+#import <SpringBoard/SBDeviceLockController.h>
+#import <SpringBoard/SBLockScreenManager.h>
+#import <SpringBoardUIServices/SBUIBiometricEventMonitor.h>
+#import <BiometricKit/BiometricKit.h>
+
 
 @interface SBReachabilityTrigger
 - (void)_debounce;
@@ -25,3 +30,32 @@
 }
 
 %end
+
+@interface TouchUnlockController : NSObject
+@end
+
+@implementation TouchUnlockController
+
+-(void)biometricEventMonitor: (id)monitor handleBiometricEvent: (unsigned)event
+{
+	if (event == 2)
+		[[%c(SBBacklightController) sharedInstance] turnOnScreenFullyWithBacklightSource:0];
+
+}
+
+-(void)startMonitoringEvents
+{
+	id monitor = [%c(SBUIBiometricEventMonitor) sharedInstance];
+	[[%c(BiometricKit) manager] setDelegate:monitor];
+	[monitor addObserver:self];
+	[monitor _setMatchingEnabled:YES];
+	[monitor _startMatching];
+}
+
+@end
+
+%ctor
+{
+   TouchUnlockController *unlockController = [[TouchUnlockController alloc] init];
+   [unlockController startMonitoringEvents];
+}
