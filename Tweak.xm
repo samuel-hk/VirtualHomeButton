@@ -14,6 +14,7 @@
 %hook SBReachabilityTrigger
 - (void)_debounce
 {
+
 	[[%c(SBUIController) sharedInstance]clickedMenuButton];
 	%orig;
 }
@@ -38,7 +39,8 @@
 
 -(void)biometricEventMonitor: (id)monitor handleBiometricEvent: (unsigned)event
 {
-	if (event == 2)
+	// event 2 finger held, event 4 finger matched, 10 not matched
+	if (event == 0 || event == 1 || event == 2 || event == 4 || event == 10)
 		[[%c(SBBacklightController) sharedInstance] turnOnScreenFullyWithBacklightSource:0];
 
 }
