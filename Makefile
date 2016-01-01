@@ -5,7 +5,7 @@ TWEAK_NAME = touchoriginal
 touchoriginal_FILES = Tweak.xm
 touchoriginal_FRAMEWORKS = UIKit AudioToolbox 
 touchoriginal_FRAMEWORKS = UIKit AudioToolbox 
-touchoriginal_PRIVATE_FRAMEWORKS = BiometricKit
+touchoriginal_PRIVATE_FRAMEWORKS = BiometricKit GraphicsServices
 
 include $(THEOS_MAKE_PATH)/tweak.mk
 
