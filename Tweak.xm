@@ -8,13 +8,12 @@
 #import <SpringBoard/SBReachabilityTrigger.h>
 #import <SpringBoardUI/SBUISound.h>
 #import <SpringBoard/SBSoundController.h>
-
 #import <SpringBoard/SBUserAgent.h>
-
 #import <AccessibilityUtilities/AXSpringBoardServer.h>
 #import <SpringBoard/SBControlCenterController.h>
-#import <SpringBoard/SBSearchViewController.h>
 #import <SpotlightUI/SPUISearchViewController.h>
+
+#import "Header.h"
 
 
 @interface SBReachabilityTrigger (YourCategory)
@@ -47,8 +46,8 @@ static NSLock *lock;
 			return 0;
 		}
 
-		 BOOL isFingerOn = [[%c(SBUIBiometricEventMonitor) sharedInstance] isFingerOn];
-		if (isFingerOn)
+		 BOOL fingerOn = [[%c(SBUIBiometricEventMonitor) sharedInstance] isFingerOn];
+		if (fingerOn)
 		{
 			[[%c(AXSpringBoardServer) server] openSiri];
 		}
@@ -83,36 +82,36 @@ static NSLock *lock;
 	/* single tap only */
 	else
 	{
-/*
-NSString *msg = @"Tapped!";
-                        NSString *title = @"title";
-                        NSString *cancel = @"OK";
-                        UIAlertView *a = [[UIAlertView alloc] initWithTitle:title
-                        message:msg delegate:nil cancelButtonTitle:cancel otherButtonTitles:nil];
-                        [a show];
-                        [a release];
-*/
-
 		
 		[[%c(SBUIController) sharedInstance]clickedMenuButton];
 
-		// dismiss siri if opened
+		/* find out if displaying special view */
+		/* view that home button method called does not work as expected*/
 		id server = [%c(AXSpringBoardServer) server];
+
+		/* Special View : Siri */
 		BOOL siriOn = [server isSiriVisible];
+
+		/* Special View : Notification Center */
 		BOOL notficationVisible = [server isNotificationCenterVisible];
+
+		/* Special View : Control Center */
 		BOOL controlCenterVisible = [server isControlCenterVisible];
+
+		/* Special View : Spotlight */
+		id spotlightViewController = [%c(SPUISearchViewController) sharedInstance];
+		bool spotlightVisible = [spotlightViewController isVisible];
+
+		/* dismiss special views */
 		if (siriOn)
+		{
 			[server dismissSiri];
+		}
 		else if (notficationVisible)
 			[server hideNotificationCenter];
 		else if (controlCenterVisible)
 			[[%c(SBControlCenterController) sharedInstance] dismissAnimated:YES];
-
-
-		id spotlightViewController = [%c(SPUISearchViewController) sharedInstance];
-		bool spotlightVisible = [spotlightViewController isVisible];
-//		_Bool spotlightVisible =  MSHookIvar<_Bool>(spotlightViewController, "_isPresenting");
-		if (spotlightVisible)
+		else if (spotlightVisible)
 			[spotlightViewController dismissAnimated:YES completionBlock:nil];
 
 	}
@@ -155,38 +154,6 @@ NSString *msg = @"Tapped!";
 	%orig;
 }
 
-- (void)_debounce
-{
-/*
-	// reset
-	[lock lock];
-	secondTap = NO;
-	secondTapDisplayed = NO;
-	[lock unlock];
-
-	// test second tap
-	unsigned long long currentNumTap =  MSHookIvar<unsigned long long>(self, "_currentNumberOfTaps");
-	if (currentNumTap == 0)
-	{
-		[lock lock];
-		secondTap = YES;
-		[lock unlock];
-	}
-	
-	%orig;
-	double delayInSeconds = 0.2;
-	dispatch_time_t popTime = dispatch_time(DISPATCH_TIME_NOW, delayInSeconds * NSEC_PER_SEC);
-
-	dispatch_after(popTime, dispatch_get_main_queue(), ^(void){
-
-		[self doSth];
-
-	});
-*/
-
-	%orig;
-}
-
 - (id)initWithDelegate:(id)arg1
 {
 	lock = [NSLock new];
@@ -218,19 +185,18 @@ NSString *msg = @"Tapped!";
 
 %end
 
-@interface TouchUnlockController : NSObject
--(void) doSth;
-@end
-
 @implementation TouchUnlockController
 
--(void)biometricEventMonitor: (id)monitor handleBiometricEvent: (unsigned)event
-{
 
++(id) sharedInstance
+{
+	return self;
+}
+
+-(void)vibrate
+{
 	int duration = 70;
 
-	if (event == 1)
-	{
 		// Create your vibration
 		SBUISound *sound = [[%c(SBUISound) alloc] init];
 		sound.repeats = NO;
@@ -261,63 +227,18 @@ NSString *msg = @"Tapped!";
 		[vibrationPatternDict release];
 		[sound release];
 
-	}
+}
+
+-(void)biometricEventMonitor: (id)monitor handleBiometricEvent: (unsigned)event
+{
+
+	if (event == 1)
+		[self vibrate];
 
 	// event 2 finger held, event 4 finger matched, 10 not matched
 	if (event == 1 || event == 2 || event == 4 || event == 10)
 		[[%c(SBBacklightController) sharedInstance] turnOnScreenFullyWithBacklightSource:0];
 
-}
-
--(void) doSth
-{
-
-	// dont do anthing for first tap id double tap
-	[lock lock];
-	if (secondTap)
-	{
-
-		// if displayed, do not display again
-		if (secondTapDisplayed)
-		{
-			[lock unlock];
-			return;
-//			return 0;
-		}
-		
-		// not displayed, continue
-		secondTapDisplayed = YES;
-
-		[[%c(SBUIController) sharedInstance]handleMenuDoubleTap];
-
-		[lock unlock];
-//		return 0;
-		return;
-	}
-	[lock unlock];
-
-	/* single tap case below */
-	
-	/* single tap and hold */
-/*
-	BOOL isFingerOn = [[%c(SBUIBiometricEventMonitor) sharedInstance] isFingerOn];
-	if (isFingerOn)
-	{
-        NSString *msg = @"Holding";
-	NSString *title = @"title";
-	NSString *cancel = @"OK";
-	UIAlertView *a = [[UIAlertView alloc] initWithTitle:title
-        message:msg delegate:nil cancelButtonTitle:cancel otherButtonTitles:nil];
-        [a show];
-        [a release];
-	}
-	else
-*/
-	[[%c(SBUIController) sharedInstance]clickedMenuButton];
-
-
-//	return 0;
-	return;
 }
 
 -(void)startMonitoringEvents
