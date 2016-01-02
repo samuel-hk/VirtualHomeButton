@@ -88,6 +88,7 @@ static NSLock *lock;
 	/* single tap only */
 	else
 	{
+/*
 NSString *msg = @"Tapped!";
                         NSString *title = @"title";
                         NSString *cancel = @"OK";
@@ -95,6 +96,7 @@ NSString *msg = @"Tapped!";
                         message:msg delegate:nil cancelButtonTitle:cancel otherButtonTitles:nil];
                         [a show];
                         [a release];
+*/
 		[[%c(SBUIController) sharedInstance]clickedMenuButton];
 	}
 
@@ -245,7 +247,7 @@ NSString *msg = @"Tapped!";
 	}
 
 	// event 2 finger held, event 4 finger matched, 10 not matched
-	if (event == 0 || event == 1 || event == 2 || event == 4 || event == 10)
+	if (event == 1 || event == 2 || event == 4 || event == 10)
 		[[%c(SBBacklightController) sharedInstance] turnOnScreenFullyWithBacklightSource:0];
 
 }
