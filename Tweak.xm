@@ -12,6 +12,10 @@
 #import <SpringBoard/SBUserAgent.h>
 
 #import <AccessibilityUtilities/AXSpringBoardServer.h>
+#import <SpringBoard/SBControlCenterController.h>
+#import <SpringBoard/SBSearchViewController.h>
+#import <SpotlightUI/SPUISearchViewController.h>
+
 
 @interface SBReachabilityTrigger (YourCategory)
 - (unsigned long long int)doSth;
@@ -46,15 +50,6 @@ static NSLock *lock;
 		 BOOL isFingerOn = [[%c(SBUIBiometricEventMonitor) sharedInstance] isFingerOn];
 		if (isFingerOn)
 		{
-			// call siri
-			NSString *msg = @"Double tap and hold";
-			NSString *title = @"title";
-			NSString *cancel = @"OK";
-			UIAlertView *a = [[UIAlertView alloc] initWithTitle:title
-			message:msg delegate:nil cancelButtonTitle:cancel otherButtonTitles:nil];
-			[a show];
-			[a release];
-
 			[[%c(AXSpringBoardServer) server] openSiri];
 		}
 
@@ -97,7 +92,29 @@ NSString *msg = @"Tapped!";
                         [a show];
                         [a release];
 */
+
+		
 		[[%c(SBUIController) sharedInstance]clickedMenuButton];
+
+		// dismiss siri if opened
+		id server = [%c(AXSpringBoardServer) server];
+		BOOL siriOn = [server isSiriVisible];
+		BOOL notficationVisible = [server isNotificationCenterVisible];
+		BOOL controlCenterVisible = [server isControlCenterVisible];
+		if (siriOn)
+			[server dismissSiri];
+		else if (notficationVisible)
+			[server hideNotificationCenter];
+		else if (controlCenterVisible)
+			[[%c(SBControlCenterController) sharedInstance] dismissAnimated:YES];
+
+
+		id spotlightViewController = [%c(SPUISearchViewController) sharedInstance];
+		bool spotlightVisible = [spotlightViewController isVisible];
+//		_Bool spotlightVisible =  MSHookIvar<_Bool>(spotlightViewController, "_isPresenting");
+		if (spotlightVisible)
+			[spotlightViewController dismissAnimated:YES completionBlock:nil];
+
 	}
 
 
