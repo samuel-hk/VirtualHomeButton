@@ -5,12 +5,13 @@
 #import <SpringBoard/SBLockScreenManager.h>
 #import <SpringBoardUIServices/SBUIBiometricEventMonitor.h>
 #import <BiometricKit/BiometricKit.h>
-
 #import <SpringBoard/SBReachabilityTrigger.h>
-#import <GraphicsServices/GSEvent.h>
 #import <SpringBoardUI/SBUISound.h>
 #import <SpringBoard/SBSoundController.h>
 
+#import <SpringBoard/SBUserAgent.h>
+
+#import <AccessibilityUtilities/AXSpringBoardServer.h>
 
 @interface SBReachabilityTrigger (YourCategory)
 - (unsigned long long int)doSth;
@@ -41,6 +42,22 @@ static NSLock *lock;
 			[lock unlock];
 			return 0;
 		}
+
+		 BOOL isFingerOn = [[%c(SBUIBiometricEventMonitor) sharedInstance] isFingerOn];
+		if (isFingerOn)
+		{
+			// call siri
+			NSString *msg = @"Double tap and hold";
+			NSString *title = @"title";
+			NSString *cancel = @"OK";
+			UIAlertView *a = [[UIAlertView alloc] initWithTitle:title
+			message:msg delegate:nil cancelButtonTitle:cancel otherButtonTitles:nil];
+			[a show];
+			[a release];
+
+			[[%c(AXSpringBoardServer) server] openSiri];
+		}
+
 		
 		// not displayed, continue
 		secondTapDisplayed = YES;
@@ -51,20 +68,77 @@ static NSLock *lock;
 		return 0;
 	}
 	[lock unlock];
-	
-//	NSString *var = @"_currentNumberOfTaps";
-//	unsigned long long currentNumTap =  MSHookIvar<unsigned long long>(self, "_currentNumberOfTaps");
-//	unsigned long long currentNumTap =  MSHookIvar<unsigned long long>(self, var);
-//unsigned long long numberOfTaps = MSHookIvar<unsigned long long>(self, "_expirationGenCount");
 
-	[[%c(SBUIController) sharedInstance]clickedMenuButton];
+	/* single tap case below */
+	
+	/* single tap and hold */
+	BOOL isFingerOn = [[%c(SBUIBiometricEventMonitor) sharedInstance] isFingerOn];
+	if (isFingerOn)
+	{
+		id lockScreen = [%c(SBLockScreenManager) sharedInstance];
+		[lockScreen hasUIEverBeenLocked];
+		_Bool locked =  MSHookIvar<_Bool>(lockScreen, "_isUILocked");
+
+		if (!locked)
+		{
+			[[%c(SBUserAgent) sharedUserAgent] lockAndDimDevice];
+		}
+	}
+
+	/* single tap only */
+	else
+	{
+NSString *msg = @"Tapped!";
+                        NSString *title = @"title";
+                        NSString *cancel = @"OK";
+                        UIAlertView *a = [[UIAlertView alloc] initWithTitle:title
+                        message:msg delegate:nil cancelButtonTitle:cancel otherButtonTitles:nil];
+                        [a show];
+                        [a release];
+		[[%c(SBUIController) sharedInstance]clickedMenuButton];
+	}
 
 
 	return 0;
 }
 
+
+- (void)biometricEventMonitor:(id)arg1 handleBiometricEvent:(unsigned long long)arg2
+{
+
+
+	if (arg2 == 1)
+{
+	// reset
+        [lock lock];
+        secondTap = NO;
+        secondTapDisplayed = NO;
+        [lock unlock];
+
+        // test second tap
+        unsigned long long currentNumTap =  MSHookIvar<unsigned long long>(self, "_currentNumberOfTaps");
+        if (currentNumTap == 1)
+        {
+                [lock lock];
+                secondTap = YES;
+                [lock unlock];
+        }
+
+        double delayInSeconds = 0.3;
+        dispatch_time_t popTime = dispatch_time(DISPATCH_TIME_NOW, delayInSeconds * NSEC_PER_SEC);
+
+        dispatch_after(popTime, dispatch_get_main_queue(), ^(void){
+
+                [self doSth];
+
+        });
+}
+	%orig;
+}
+
 - (void)_debounce
 {
+/*
 	// reset
 	[lock lock];
 	secondTap = NO;
@@ -89,7 +163,9 @@ static NSLock *lock;
 		[self doSth];
 
 	});
+*/
 
+	%orig;
 }
 
 - (id)initWithDelegate:(id)arg1
@@ -124,6 +200,7 @@ static NSLock *lock;
 %end
 
 @interface TouchUnlockController : NSObject
+-(void) doSth;
 @end
 
 @implementation TouchUnlockController
@@ -164,12 +241,64 @@ static NSLock *lock;
 		[vibrationPatternArray release];
 		[vibrationPatternDict release];
 		[sound release];
+
 	}
 
 	// event 2 finger held, event 4 finger matched, 10 not matched
 	if (event == 0 || event == 1 || event == 2 || event == 4 || event == 10)
 		[[%c(SBBacklightController) sharedInstance] turnOnScreenFullyWithBacklightSource:0];
 
+}
+
+-(void) doSth
+{
+
+	// dont do anthing for first tap id double tap
+	[lock lock];
+	if (secondTap)
+	{
+
+		// if displayed, do not display again
+		if (secondTapDisplayed)
+		{
+			[lock unlock];
+			return;
+//			return 0;
+		}
+		
+		// not displayed, continue
+		secondTapDisplayed = YES;
+
+		[[%c(SBUIController) sharedInstance]handleMenuDoubleTap];
+
+		[lock unlock];
+//		return 0;
+		return;
+	}
+	[lock unlock];
+
+	/* single tap case below */
+	
+	/* single tap and hold */
+/*
+	BOOL isFingerOn = [[%c(SBUIBiometricEventMonitor) sharedInstance] isFingerOn];
+	if (isFingerOn)
+	{
+        NSString *msg = @"Holding";
+	NSString *title = @"title";
+	NSString *cancel = @"OK";
+	UIAlertView *a = [[UIAlertView alloc] initWithTitle:title
+        message:msg delegate:nil cancelButtonTitle:cancel otherButtonTitles:nil];
+        [a show];
+        [a release];
+	}
+	else
+*/
+	[[%c(SBUIController) sharedInstance]clickedMenuButton];
+
+
+//	return 0;
+	return;
 }
 
 -(void)startMonitoringEvents
