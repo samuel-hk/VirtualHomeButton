@@ -11,7 +11,7 @@ investigate three tap
 indivial finger -> different action
 
 Issue:
-Single Tap not working when in siri
+None as of now
 
 Test Case:
 Single Tap
