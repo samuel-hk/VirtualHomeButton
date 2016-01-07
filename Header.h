@@ -7,5 +7,8 @@
 @property BOOL canLock;
 -(void) deviceCanLockNow : (bool)can;
 -(bool) canDeviceBeLocked;
+-(unsigned long long int)processTapping;
+
+@property NSUInteger currentTapNum;
 
 @end

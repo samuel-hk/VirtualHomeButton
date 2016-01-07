@@ -15,156 +15,8 @@
 
 #import "Header.h"
 
-
-@interface SBReachabilityTrigger (YourCategory)
-- (unsigned long long int)processTapping;
-@end
-
-
-%hook SBReachabilityTrigger
-%new
-_Bool secondTap;
-%new
-_Bool secondTapDisplayed;
-
-%new
-static NSLock *lock;
-
-%new(v@:)
-- (unsigned long long int)processTapping
-{
-
-	// dont do anthing for first tap id double tap
-	[lock lock];
-	if (secondTap)
-	{
-
-		// if displayed, do not display again
-		if (secondTapDisplayed)
-		{
-			[lock unlock];
-			return 0;
-		}
-
-		/* Second tap and hold */
-		BOOL fingerOn = [[%c(SBUIBiometricEventMonitor) sharedInstance] isFingerOn];
-		id lockScreen = [%c(SBLockScreenManager) sharedInstance];
-		_Bool locked =  MSHookIvar<_Bool>(lockScreen, "_isUILocked");
-		if (fingerOn && !locked)
-			[[%c(AXSpringBoardServer) server] openSiri];
-
-		
-		// not displayed, continue
-		secondTapDisplayed = YES;
-
-		/* Second tap only */
-		[[%c(SBUIController) sharedInstance]handleMenuDoubleTap];
-
-		[lock unlock];
-		return 0;
-	}
-	[lock unlock];
-
-	/* single tap case below */
-	
-	/* single tap and hold */
-	bool canLock = [[%c(TouchUnlockController) sharedInstance] canDeviceBeLocked];
-	BOOL isFingerOn = [[%c(SBUIBiometricEventMonitor) sharedInstance] isFingerOn];
-	if (isFingerOn && canLock)
-	{
-		id lockScreen = [%c(SBLockScreenManager) sharedInstance];
-		_Bool locked =  MSHookIvar<_Bool>(lockScreen, "_isUILocked");
-
-		if (!locked)
-		{
-			[[%c(SBUserAgent) sharedUserAgent] lockAndDimDevice];
-		}
-	}
-
-	/* single tap only */
-	else
-	{
-		
-		[[%c(SBUIController) sharedInstance]clickedMenuButton];
-
-		/* find out if displaying special view */
-		/* view that home button method called does not work as expected*/
-		id server = [%c(AXSpringBoardServer) server];
-
-		/* Special View : Siri */
-		BOOL siriOn = [server isSiriVisible];
-
-		/* Special View : Notification Center */
-		BOOL notficationVisible = [server isNotificationCenterVisible];
-
-		/* Special View : Control Center */
-		BOOL controlCenterVisible = [server isControlCenterVisible];
-
-		/* Special View : Spotlight */
-		id spotlightViewController = [%c(SPUISearchViewController) sharedInstance];
-		bool spotlightVisible = [spotlightViewController isVisible];
-
-		/* dismiss special views */
-		if (siriOn)
-		{
-			[server dismissSiri];
-		}
-		else if (notficationVisible)
-			[server hideNotificationCenter];
-		else if (controlCenterVisible)
-			[[%c(SBControlCenterController) sharedInstance] dismissAnimated:YES];
-		else if (spotlightVisible)
-			[spotlightViewController dismissAnimated:YES completionBlock:nil];
-
-	}
-
-
-	return 0;
-}
-
-
-- (void)biometricEventMonitor:(id)arg1 handleBiometricEvent:(unsigned long long)arg2
-{
-
-
-	if (arg2 == 1)
-	{
-		// reset
-		[lock lock];
-		secondTap = NO;
-		secondTapDisplayed = NO;
-		[lock unlock];
-
-		// test second tap
-		unsigned long long currentNumTap =  MSHookIvar<unsigned long long>(self, "_currentNumberOfTaps");
-		if (currentNumTap == 1)
-		{
-			[lock lock];
-			secondTap = YES;
-			[lock unlock];
-		}
-
-		double delayInSeconds = 0.3;
-		dispatch_time_t popTime = dispatch_time(DISPATCH_TIME_NOW, delayInSeconds * NSEC_PER_SEC);
-
-		dispatch_after(popTime, dispatch_get_main_queue(), ^(void){
-		       [self processTapping];
-		});
-	}
-	%orig;
-}
-
-- (id)initWithDelegate:(id)arg1
-{
-	lock = [NSLock new];
-
-	secondTapDisplayed = NO;
-	secondTap = NO;
-
-	return %orig;
-}
-
-%end
+//#import <SAObjects/SASettingOpenAssistiveTouch.h>
+#import <Preferences/PSAssistiveTouchSettingsDetail.h>
 
 %hook SBReachabilityManager
 - (void)_toggleReachabilityModeWithRequestingObserver:(id)arg1
@@ -189,6 +41,110 @@ static NSLock *lock;
 
 static NSLock *mutex;
 static TouchUnlockController *instance;
+
+_Bool secondTap;
+_Bool secondTapDisplayed;
+static NSLock *lock;
+/*
+static NSLock *timeLock;
+NSDate *runTime;
+*/
+
+-(unsigned long long int)processTapping
+{
+
+	[lock lock];
+	NSUInteger tapNum = _currentTapNum;
+	_currentTapNum = 0;
+	[lock unlock];
+
+	// dont do anthing for first tap id double tap
+	if (tapNum == 3)
+	{
+		bool assistiveTouchEnabled = [%c(PSAssistiveTouchSettingsDetail) isEnabled];
+		if (assistiveTouchEnabled)
+			[%c(PSAssistiveTouchSettingsDetail) setEnabled:NO];
+		else
+			[%c(PSAssistiveTouchSettingsDetail) setEnabled:YES];
+
+		return 0;
+	} // end if, triple tap cases
+
+	else if (tapNum == 2)
+	{
+
+			/* Second tap and hold */
+			BOOL fingerOn = [[%c(SBUIBiometricEventMonitor) sharedInstance] isFingerOn];
+			id lockScreen = [%c(SBLockScreenManager) sharedInstance];
+			_Bool locked =  MSHookIvar<_Bool>(lockScreen, "_isUILocked");
+			if (fingerOn && !locked)
+				[[%c(AXSpringBoardServer) server] openSiri];
+
+			
+			// not displayed, continue
+			secondTapDisplayed = YES;
+
+			/* Second tap only */
+			[[%c(SBUIController) sharedInstance]handleMenuDoubleTap];
+	} // end if, double tap cases
+
+	/* single tap case below */
+	else if (tapNum == 1)
+	{
+		
+		/* single tap and hold */
+		bool canLock = [self canDeviceBeLocked];
+		BOOL isFingerOn = [[%c(SBUIBiometricEventMonitor) sharedInstance] isFingerOn];
+		if (isFingerOn && canLock)
+		{
+			id lockScreen = [%c(SBLockScreenManager) sharedInstance];
+			_Bool locked =  MSHookIvar<_Bool>(lockScreen, "_isUILocked");
+
+			if (!locked)
+				[[%c(SBUserAgent) sharedUserAgent] lockAndDimDevice];
+		} // single tap and hold
+
+		/* single tap only */
+		else
+		{
+			
+			[[%c(SBUIController) sharedInstance]clickedMenuButton];
+
+			/* find out if displaying special view */
+			/* view that home button method called does not work as expected*/
+			id server = [%c(AXSpringBoardServer) server];
+
+			/* Special View : Siri */
+			BOOL siriOn = [server isSiriVisible];
+
+			/* Special View : Notification Center */
+			BOOL notficationVisible = [server isNotificationCenterVisible];
+
+			/* Special View : Control Center */
+			BOOL controlCenterVisible = [server isControlCenterVisible];
+
+			/* Special View : Spotlight */
+			id spotlightViewController = [%c(SPUISearchViewController) sharedInstance];
+			bool spotlightVisible = [spotlightViewController isVisible];
+
+			/* dismiss special views */
+			if (siriOn)
+				[server dismissSiri];
+			else if (notficationVisible)
+				[server hideNotificationCenter];
+			else if (controlCenterVisible)
+				[[%c(SBControlCenterController) sharedInstance] dismissAnimated:YES];
+			else if (spotlightVisible)
+				[spotlightViewController dismissAnimated:YES completionBlock:nil];
+
+
+		} // end if, single tap only
+	} // single tap cases end
+
+
+	return 0;
+}
+
 
 -(void) setInstance:(id)arg1
 {
@@ -239,6 +195,13 @@ static TouchUnlockController *instance;
 
 -(void)biometricEventMonitor: (id)monitor handleBiometricEvent: (unsigned)event
 {
+/*
+	NSDate *mydate = [NSDate date];
+	NSTimeInterval secondsInEightHours = 0.1;
+	NSDate *dateEightHoursAhead = [mydate dateByAddingTimeInterval:secondsInEightHours];
+	[dateEightHoursAhead dateByAddingTimeInterval:secondsInEightHours];
+*/
+
 
 	if (event == 1)
 	{
@@ -267,6 +230,33 @@ static TouchUnlockController *instance;
 
 
 	}
+
+	if (event == 1)
+	{
+		// reset
+		[lock lock];
+		_currentTapNum = _currentTapNum + 1;
+		secondTap = NO;
+		secondTapDisplayed = NO;
+		[lock unlock];
+
+		// test second tap
+		unsigned long long currentNumTap =  _currentTapNum;
+		if (currentNumTap == 2)
+		{
+			[lock lock];
+			secondTap = YES;
+			[lock unlock];
+		}
+
+		double delayInSeconds = 0.35;
+		dispatch_time_t popTime = dispatch_time(DISPATCH_TIME_NOW, delayInSeconds * NSEC_PER_SEC);
+
+		dispatch_after(popTime, dispatch_get_main_queue(), ^(void){
+		       [self processTapping];
+		});
+	}
+
 
 } // end method biometricEventMonitor
 
@@ -299,6 +289,11 @@ static TouchUnlockController *instance;
 	mutex = [NSLock new];
 	_isUnlocking = NO;
 	_canLock = YES;
+
+	lock = [NSLock new];
+	secondTapDisplayed = NO;
+	secondTap = NO;
+	_currentTapNum = 0;
 }
 
 @end
