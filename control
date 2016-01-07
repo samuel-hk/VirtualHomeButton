@@ -1,5 +1,5 @@
-Package: com.yourcompany.touchoriginal
-Name: touchoriginal
+Package: io.github.samuelyeungkc
+Name: TapID
 Depends: mobilesubstrate
 Version: 0.0.1
 Architecture: iphoneos-arm

@@ -17,7 +17,7 @@
 
 
 @interface SBReachabilityTrigger (YourCategory)
-- (unsigned long long int)doSth;
+- (unsigned long long int)processTapping;
 @end
 
 
@@ -31,7 +31,7 @@ _Bool secondTapDisplayed;
 static NSLock *lock;
 
 %new(v@:)
-- (unsigned long long int)doSth
+- (unsigned long long int)processTapping
 {
 
 	// dont do anthing for first tap id double tap
@@ -46,16 +46,18 @@ static NSLock *lock;
 			return 0;
 		}
 
-		 BOOL fingerOn = [[%c(SBUIBiometricEventMonitor) sharedInstance] isFingerOn];
-		if (fingerOn)
-		{
+		/* Second tap and hold */
+		BOOL fingerOn = [[%c(SBUIBiometricEventMonitor) sharedInstance] isFingerOn];
+		id lockScreen = [%c(SBLockScreenManager) sharedInstance];
+		_Bool locked =  MSHookIvar<_Bool>(lockScreen, "_isUILocked");
+		if (fingerOn && !locked)
 			[[%c(AXSpringBoardServer) server] openSiri];
-		}
 
 		
 		// not displayed, continue
 		secondTapDisplayed = YES;
 
+		/* Second tap only */
 		[[%c(SBUIController) sharedInstance]handleMenuDoubleTap];
 
 		[lock unlock];
@@ -66,11 +68,11 @@ static NSLock *lock;
 	/* single tap case below */
 	
 	/* single tap and hold */
+	bool canLock = [[%c(TouchUnlockController) sharedInstance] canDeviceBeLocked];
 	BOOL isFingerOn = [[%c(SBUIBiometricEventMonitor) sharedInstance] isFingerOn];
-	if (isFingerOn)
+	if (isFingerOn && canLock)
 	{
 		id lockScreen = [%c(SBLockScreenManager) sharedInstance];
-		[lockScreen hasUIEverBeenLocked];
 		_Bool locked =  MSHookIvar<_Bool>(lockScreen, "_isUILocked");
 
 		if (!locked)
@@ -126,31 +128,29 @@ static NSLock *lock;
 
 
 	if (arg2 == 1)
-{
-	// reset
-        [lock lock];
-        secondTap = NO;
-        secondTapDisplayed = NO;
-        [lock unlock];
+	{
+		// reset
+		[lock lock];
+		secondTap = NO;
+		secondTapDisplayed = NO;
+		[lock unlock];
 
-        // test second tap
-        unsigned long long currentNumTap =  MSHookIvar<unsigned long long>(self, "_currentNumberOfTaps");
-        if (currentNumTap == 1)
-        {
-                [lock lock];
-                secondTap = YES;
-                [lock unlock];
-        }
+		// test second tap
+		unsigned long long currentNumTap =  MSHookIvar<unsigned long long>(self, "_currentNumberOfTaps");
+		if (currentNumTap == 1)
+		{
+			[lock lock];
+			secondTap = YES;
+			[lock unlock];
+		}
 
-        double delayInSeconds = 0.3;
-        dispatch_time_t popTime = dispatch_time(DISPATCH_TIME_NOW, delayInSeconds * NSEC_PER_SEC);
+		double delayInSeconds = 0.3;
+		dispatch_time_t popTime = dispatch_time(DISPATCH_TIME_NOW, delayInSeconds * NSEC_PER_SEC);
 
-        dispatch_after(popTime, dispatch_get_main_queue(), ^(void){
-
-                [self doSth];
-
-        });
-}
+		dispatch_after(popTime, dispatch_get_main_queue(), ^(void){
+		       [self processTapping];
+		});
+	}
 	%orig;
 }
 
@@ -187,45 +187,53 @@ static NSLock *lock;
 
 @implementation TouchUnlockController
 
+static NSLock *mutex;
+static TouchUnlockController *instance;
+
+-(void) setInstance:(id)arg1
+{
+	instance = arg1;
+}
+
 
 +(id) sharedInstance
 {
-	return self;
+	return instance;
 }
 
 -(void)vibrate
 {
-	int duration = 70;
+	int duration = 50;
 
-		// Create your vibration
-		SBUISound *sound = [[%c(SBUISound) alloc] init];
-		sound.repeats = NO;
-		sound.systemSoundID = 0;
+	// Create your vibration
+	SBUISound *sound = [[%c(SBUISound) alloc] init];
+	sound.repeats = NO;
+	sound.systemSoundID = 0;
 
-		// Create an array for your vibration pattern
-		NSMutableArray* vibrationPatternArray = [[NSMutableArray alloc] init];
+	// Create an array for your vibration pattern
+	NSMutableArray* vibrationPatternArray = [[NSMutableArray alloc] init];
 
-		// Create your vibration pattern
+	// Create your vibration pattern
 
-		// Vibrate for 500 ms
-		[vibrationPatternArray addObject:@(YES)];
-		[vibrationPatternArray addObject:@(duration)];
+	// Vibrate for 500 ms
+	[vibrationPatternArray addObject:@(YES)];
+	[vibrationPatternArray addObject:@(duration)];
 
-		// Create a dict to hold vibration pattern and the intensity of the vibration
-		NSMutableDictionary* vibrationPatternDict = [[NSMutableDictionary alloc] init];
+	// Create a dict to hold vibration pattern and the intensity of the vibration
+	NSMutableDictionary* vibrationPatternDict = [[NSMutableDictionary alloc] init];
 
-		[vibrationPatternDict setObject:vibrationPatternArray forKey:@"VibePattern"];
-		[vibrationPatternDict setObject:@(1) forKey:@"Intensity"];
+	[vibrationPatternDict setObject:vibrationPatternArray forKey:@"VibePattern"];
+	[vibrationPatternDict setObject:@(1) forKey:@"Intensity"];
 
-		sound.vibrationPattern = vibrationPatternDict;
+	sound.vibrationPattern = vibrationPatternDict;
 
-		// Actually play the vibration
-		[(SBSoundController *)[%c(SBSoundController) sharedInstance] _playSystemSound:sound];
+	// Actually play the vibration
+	[(SBSoundController *)[%c(SBSoundController) sharedInstance] _playSystemSound:sound];
 
-		// Clean up
-		[vibrationPatternArray release];
-		[vibrationPatternDict release];
-		[sound release];
+	// Clean up
+	[vibrationPatternArray release];
+	[vibrationPatternDict release];
+	[sound release];
 
 }
 
@@ -233,13 +241,34 @@ static NSLock *lock;
 {
 
 	if (event == 1)
+	{
 		[self vibrate];
 
-	// event 2 finger held, event 4 finger matched, 10 not matched
-	if (event == 1 || event == 2 || event == 4 || event == 10)
-		[[%c(SBBacklightController) sharedInstance] turnOnScreenFullyWithBacklightSource:0];
+		// light up screen from sleep
+		id lockScreen = [%c(SBLockScreenManager) sharedInstance];
+		_Bool locked =  MSHookIvar<_Bool>(lockScreen, "_isUILocked");
+		if (locked)
+			[[%c(SBBacklightController) sharedInstance] turnOnScreenFullyWithBacklightSource:0];
+	}
 
-}
+	// event 2 finger held, event 4 finger matched, 10 not matched
+	// only lock device after a period passed since last unlock
+	if ( event == 4 || event == 10 )
+	{
+
+		[self deviceCanLockNow:NO];
+
+		double delayInSeconds = 0.8;
+		dispatch_time_t popTime = dispatch_time(DISPATCH_TIME_NOW, delayInSeconds * NSEC_PER_SEC);
+
+		dispatch_after(popTime, dispatch_get_main_queue(), ^(void){
+			[self deviceCanLockNow:YES];
+		});
+
+
+	}
+
+} // end method biometricEventMonitor
 
 -(void)startMonitoringEvents
 {
@@ -250,12 +279,36 @@ static NSLock *lock;
 	[monitor _startMatching];
 }
 
+-(void) deviceCanLockNow : (bool)can
+{
+    [mutex lock];
+    _canLock = can;
+    [mutex unlock];
+}
+
+-(bool) canDeviceBeLocked
+{
+	[mutex lock];
+	bool result = _canLock;
+	[mutex unlock];
+	return result;
+}
+
+-(void) initVar
+{
+	mutex = [NSLock new];
+	_isUnlocking = NO;
+	_canLock = YES;
+}
+
 @end
 
 %ctor
 {
-   TouchUnlockController *unlockController = [[TouchUnlockController alloc] init];
-   [unlockController startMonitoringEvents];
+	TouchUnlockController *unlockController = [[TouchUnlockController alloc] init];
+	[unlockController initVar];
+	[unlockController startMonitoringEvents];
+	unlockController.instance = unlockController;
 }
 
 /*
