@@ -18,6 +18,8 @@
 //#import <SAObjects/SASettingOpenAssistiveTouch.h>
 #import <Preferences/PSAssistiveTouchSettingsDetail.h>
 
+#import <float.h>
+
 %hook SBReachabilityManager
 - (void)_toggleReachabilityModeWithRequestingObserver:(id)arg1
 {
@@ -45,17 +47,31 @@ static TouchUnlockController *instance;
 _Bool secondTap;
 _Bool secondTapDisplayed;
 static NSLock *lock;
-/*
 static NSLock *timeLock;
 NSDate *runTime;
-*/
+double runTimeDouble;
 
 -(unsigned long long int)processTapping
 {
 
+	NSDate *now = [NSDate date];
+	double nowTime = [now timeIntervalSinceReferenceDate];
+	bool notTimeToRunYet = NO;
+	[lock lock];
+	if (nowTime < runTimeDouble)
+		notTimeToRunYet = YES;
+	[lock unlock];
+
+	// do not run if not scheudle time yet
+	if (notTimeToRunYet)
+		return 0;
+
+
 	[lock lock];
 	NSUInteger tapNum = _currentTapNum;
 	_currentTapNum = 0;
+	runTimeDouble = DBL_MAX;
+	runTime = nil;
 	[lock unlock];
 
 	// dont do anthing for first tap id double tap
@@ -66,7 +82,6 @@ NSDate *runTime;
 			[%c(PSAssistiveTouchSettingsDetail) setEnabled:NO];
 		else
 			[%c(PSAssistiveTouchSettingsDetail) setEnabled:YES];
-
 		return 0;
 	} // end if, triple tap cases
 
@@ -141,9 +156,8 @@ NSDate *runTime;
 		} // end if, single tap only
 	} // single tap cases end
 
-
 	return 0;
-}
+} // end method processTapping
 
 
 -(void) setInstance:(id)arg1
@@ -171,7 +185,7 @@ NSDate *runTime;
 
 	// Create your vibration pattern
 
-	// Vibrate for 500 ms
+	// Vibrate for duration specified
 	[vibrationPatternArray addObject:@(YES)];
 	[vibrationPatternArray addObject:@(duration)];
 
@@ -233,24 +247,19 @@ NSDate *runTime;
 
 	if (event == 1)
 	{
+		double delayInSeconds = 0.2;
+		NSDate *nowDate = [NSDate date];
+		
 		// reset
 		[lock lock];
+		runTimeDouble = [nowDate timeIntervalSinceReferenceDate] + delayInSeconds;
 		_currentTapNum = _currentTapNum + 1;
 		secondTap = NO;
 		secondTapDisplayed = NO;
 		[lock unlock];
 
-		// test second tap
-		unsigned long long currentNumTap =  _currentTapNum;
-		if (currentNumTap == 2)
-		{
-			[lock lock];
-			secondTap = YES;
-			[lock unlock];
-		}
-
-		double delayInSeconds = 0.35;
-		dispatch_time_t popTime = dispatch_time(DISPATCH_TIME_NOW, delayInSeconds * NSEC_PER_SEC);
+		dispatch_time_t now = DISPATCH_TIME_NOW;
+		dispatch_time_t popTime = dispatch_time(now, delayInSeconds * NSEC_PER_SEC);
 
 		dispatch_after(popTime, dispatch_get_main_queue(), ^(void){
 		       [self processTapping];
@@ -276,6 +285,17 @@ NSDate *runTime;
     [mutex unlock];
 }
 
+-(void) displayMsg : (NSString*) str
+{
+        NSString *msg = str;
+	NSString *title = @"title";
+	NSString *cancel = @"OK";
+	UIAlertView *a = [[UIAlertView alloc] initWithTitle:title
+        message:msg delegate:nil cancelButtonTitle:cancel otherButtonTitles:nil];
+        [a show];
+        [a release];
+}
+
 -(bool) canDeviceBeLocked
 {
 	[mutex lock];
@@ -294,6 +314,8 @@ NSDate *runTime;
 	secondTapDisplayed = NO;
 	secondTap = NO;
 	_currentTapNum = 0;
+
+	timeLock = [NSLock new];
 }
 
 @end

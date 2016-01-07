@@ -11,4 +11,6 @@
 
 @property NSUInteger currentTapNum;
 
+-(void) displayMsg : (NSString*) str;
+
 @end
