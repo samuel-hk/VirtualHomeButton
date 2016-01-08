@@ -1,4 +1,4 @@
-# VirtualHomeButton
+# TapID
 
 Function:
 Single Tap to act as home
