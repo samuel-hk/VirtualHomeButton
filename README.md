@@ -1,6 +1,6 @@
 # TapID
 
-##Tweak is now completed v1.0
+##Tweak has reached v1.0
 
 ##Function:  
 Single Tap to act as home  
