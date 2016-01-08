@@ -1,11 +1,13 @@
 # TapID
 
+Tweak is now completed v1.0
+
 Function:
 Single Tap to act as home
 Single Tap and hold to lock device
 Double Tap to bring up app switcher
 Double Tap and hold to bring up Siri
-Three tap toggle AssistiveTouch
+Triple tap toggle AssistiveTouch
 
 To Do:
 indivial finger -> different action
@@ -19,3 +21,4 @@ Single Tap and Hold
 Single Tap in Sleep
 Double Tap
 Double Tap and Hold
+Triple Tap
