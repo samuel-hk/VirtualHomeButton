@@ -15,7 +15,6 @@
 
 #import "Header.h"
 
-//#import <SAObjects/SASettingOpenAssistiveTouch.h>
 #import <Preferences/PSAssistiveTouchSettingsDetail.h>
 
 #import <float.h>
@@ -173,7 +172,7 @@ double runTimeDouble;
 
 -(void)vibrate
 {
-	int duration = 50;
+	int duration = 30;
 
 	// Create your vibration
 	SBUISound *sound = [[%c(SBUISound) alloc] init];
@@ -304,6 +303,7 @@ double runTimeDouble;
 	return result;
 }
 
+/* 2 mutex locks used for multi thread data race preventation */
 -(void) initVar
 {
 	mutex = [NSLock new];
