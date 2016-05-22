@@ -28,9 +28,7 @@
 
 %hook SBUIBiometricEventMonitor
 
-//If either of these methods are enabled, they prevent touchID events from being sent to
-//the touch unlock controller while the device is locked and a passcode isn't enabled.
-//So, we make them do nothing if the device doesn't have a passcode, so this tweak can work.
+/* prevent touchID sensor from being powered off when device is locked */
 - (void)noteScreenDidTurnOff {
 }
 - (void)noteScreenWillTurnOff {
